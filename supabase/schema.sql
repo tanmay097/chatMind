@@ -6,6 +6,7 @@
 -- 1. Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 2. Profiles Table (Linked with Supabase Auth or custom users)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Index for searching users
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles (email);
-CREATE INDEX IF NOT EXISTS idx_profiles_name ON public.profiles USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_profiles_name ON public.profiles (name);
 
 -- 3. Chats Table (1-on-1 and Group Chats)
 CREATE TABLE IF NOT EXISTS public.chats (
