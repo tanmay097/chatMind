@@ -12,6 +12,55 @@ const generateToken = (id) => {
 // @desc    Register new user
 // @route   POST /api/user/
 // @access  Public
+// Helper to handle avatar uploads to Supabase storage
+const uploadAvatarToSupabase = async (reqPic, reqFiles) => {
+  const defaultPic = "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg";
+  
+  try {
+    if (reqFiles && reqFiles.pic) {
+      const file = reqFiles.pic;
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const { data: uploadData, error: uploadErr } = await supabaseAdmin.storage
+        .from("avatars")
+        .upload(fileName, file.data, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+      if (!uploadErr && uploadData) {
+        const { data: { publicUrl } } = supabaseAdmin.storage.from("avatars").getPublicUrl(fileName);
+        return publicUrl;
+      }
+    } else if (reqPic && typeof reqPic === "string" && reqPic.startsWith("data:image")) {
+      const match = reqPic.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (match) {
+        const mimeType = match[1];
+        const buffer = Buffer.from(match[2], "base64");
+        const ext = mimeType.split("/")[1] || "png";
+        const fileName = `${Date.now()}_avatar.${ext}`;
+        const { data: uploadData, error: uploadErr } = await supabaseAdmin.storage
+          .from("avatars")
+          .upload(fileName, buffer, {
+            contentType: mimeType,
+            upsert: true,
+          });
+        if (!uploadErr && uploadData) {
+          const { data: { publicUrl } } = supabaseAdmin.storage.from("avatars").getPublicUrl(fileName);
+          return publicUrl;
+        }
+      }
+    } else if (reqPic && typeof reqPic === "string" && reqPic.startsWith("http")) {
+      return reqPic;
+    }
+  } catch (err) {
+    console.warn("Avatar upload notice:", err.message);
+  }
+
+  return defaultPic;
+};
+
+// @desc    Register new user
+// @route   POST /api/user/
+// @access  Public
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password, pic } = req.body;
@@ -20,65 +69,76 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: "Please enter all fields" });
     }
 
+    const trimmedEmail = email.trim().toLowerCase();
+
     // Check if user already exists in profiles
     const { data: existingUser } = await supabaseAdmin
       .from("profiles")
       .select("*")
-      .eq("email", email)
+      .eq("email", trimmedEmail)
       .maybeSingle();
 
     if (existingUser) {
       return res.status(400).json({ message: "User already exists with this email" });
     }
 
+    const profilePic = await uploadAvatarToSupabase(pic, req.files);
+    const passwordHash = await bcrypt.hash(password, 10);
+
     let authUserId = null;
-    let token = null;
+    let createdProfile = null;
 
     // Try creating user in Supabase Auth
     try {
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: trimmedEmail,
         password,
         email_confirm: true,
-        user_metadata: { name, pic },
+        user_metadata: { name: name.trim(), pic: profilePic },
       });
 
       if (!authError && authData.user) {
         authUserId = authData.user.id;
       }
     } catch (authErr) {
-      console.warn("Supabase Auth admin createUser skipped, inserting directly into profiles:", authErr.message);
+      console.warn("Supabase Auth admin createUser notice:", authErr.message);
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const profilePic = pic || "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg";
+    // Upsert into profiles table to prevent race conditions with database trigger
+    const profilePayload = {
+      name: name.trim(),
+      email: trimmedEmail,
+      pic: profilePic,
+      is_admin: false,
+      password_hash: passwordHash,
+      updated_at: new Date().toISOString(),
+    };
 
-    const { data: newProfile, error: profileErr } = await supabaseAdmin
+    if (authUserId) {
+      profilePayload.id = authUserId;
+      profilePayload.auth_user_id = authUserId;
+    }
+
+    const { data: upsertedProfile, error: profileErr } = await supabaseAdmin
       .from("profiles")
-      .insert({
-        auth_user_id: authUserId,
-        name,
-        email,
-        pic: profilePic,
-        is_admin: false,
-        password_hash: passwordHash,
-      })
+      .upsert(profilePayload, { onConflict: "email" })
       .select()
       .single();
 
-    if (profileErr || !newProfile) {
+    if (profileErr || !upsertedProfile) {
       return res.status(500).json({ message: profileErr?.message || "Failed to create user profile" });
     }
 
-    token = generateToken(newProfile.id);
+    createdProfile = upsertedProfile;
+    const token = generateToken(createdProfile.id);
 
     const responseUser = {
-      _id: newProfile.id,
-      id: newProfile.id,
-      name: newProfile.name,
-      email: newProfile.email,
-      pic: newProfile.pic,
-      isAdmin: newProfile.is_admin,
+      _id: createdProfile.id,
+      id: createdProfile.id,
+      name: createdProfile.name,
+      email: createdProfile.email,
+      pic: createdProfile.pic,
+      isAdmin: createdProfile.is_admin,
       token,
     };
 
