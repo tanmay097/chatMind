@@ -27,27 +27,27 @@ const Login = () => {
   // const [loading, setLoading] = useState(false);
   const toast = useToast();
   const history = useHistory();
-const { isAuth ,setIsAuth } = ChatState();
- const handleEmailChange = (event) => {
-   const newEmail = event.target.value;
-   setEmail(newEmail);
-   setIsValidEmail(
-     newEmail !== "" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)
-   );
- };
+  const { isAuth, setIsAuth, setUser } = ChatState();
+  const handleEmailChange = (event) => {
+    const newEmail = event.target.value;
+    setEmail(newEmail);
+    setIsValidEmail(
+      newEmail !== "" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)
+    );
+  };
 
- const handlePasswordChange = (event) => {
-   setPassword(event.target.value);
- };
+  const handlePasswordChange = (event) => {
+    setPassword(event.target.value);
+  };
 
- const handleShowPasswordClick = () => {
-   setShowPassword(!showPassword);
- };
+  const handleShowPasswordClick = () => {
+    setShowPassword(!showPassword);
+  };
 
- const isSignInDisabled = !(email && password && isValidEmail);
+  const isSignInDisabled = !(email && password && isValidEmail);
 
   const submitHandler = async () => {
- setIsAuth(true);
+    setIsAuth(true);
     if (!email || !password) {
       toast({
         title: "Please Fill all the Feilds",
@@ -60,7 +60,6 @@ const { isAuth ,setIsAuth } = ChatState();
       return;
     }
 
-    // console.log(email, password);
     try {
       const config = {
         headers: {
@@ -74,7 +73,6 @@ const { isAuth ,setIsAuth } = ChatState();
         config
       );
 
-   
       toast({
         title: "Login Successful",
         status: "success",
@@ -83,10 +81,11 @@ const { isAuth ,setIsAuth } = ChatState();
         position: "bottom",
       });
       localStorage.setItem("userInfo", JSON.stringify(data));
-         setTimeout(() => {
+      setUser(data);
+      setTimeout(() => {
         setIsAuth(false);
         history.push("/chats");
-         }, 2000);
+      }, 500);
       
     } catch (error) {
        setIsAuth(false);

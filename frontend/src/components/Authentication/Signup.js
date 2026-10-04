@@ -24,7 +24,7 @@ const Signup = () => {
   const classes = useStyles();
   const toast = useToast();
   const history = useHistory();
-const { setIsAuth } = ChatState();
+  const { setIsAuth, setUser } = ChatState();
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -67,35 +67,30 @@ const submitHandler = async () => {
 
     const { data } = await axios.post("/api/user", formData, config);
     
-   
     if (data) { 
-     
-     toast({
-       title: "User Created Successfully",
-       status: "success",
-       duration: 5000,
-       isClosable: true,
-       position: "bottom",
-     });
-    }
-
-    if (data) {
+      toast({
+        title: "User Created Successfully",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+        position: "bottom",
+      });
       localStorage.setItem("userInfo", JSON.stringify(data));
-       setIsLoginDisabled(false);
-       setIsAuth(true);
-      setIsAuth(true);
-    }
-     
+      setUser(data);
+      setIsLoginDisabled(false);
+      setIsAuth(false);
       history.push("/chats");
-    } catch (error) {
+    }
+  } catch (error) {
     setIsLoginDisabled(false);
-       toast({
-         title: error.response.statusText,
-         status: "error",
-         duration: 5000,
-         isClosable: true,
-         position: "bottom",
-       });
+    toast({
+      title: error?.response?.data?.message || error.message || "Sign up failed",
+      status: "error",
+      duration: 5000,
+      isClosable: true,
+      position: "bottom",
+    });
+  }
    
     }
   };

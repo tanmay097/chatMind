@@ -15,29 +15,16 @@ const ForgetPassowrd = React.lazy(() =>
 );
 
 function App() { 
-  const history = useHistory(); 
-  const user = JSON.parse(localStorage.getItem("userInfo"));
- 
-  useEffect(() => {
-    if (!user) {
-      history.push("/");
-    } else {
-      history.push("/chats");
-    }
-  }, [history, user]);
-
   return (
     <div className="App">
-      <Router>
-        <React.Suspense fallback={<Loader />}>
-          <Switch>
-            <Route exact path="/signup" component={Signup} />
-            <Route exact path="/" component={Login} />
-            <Route exact path="/forgot/password" component={ForgetPassowrd} />
-            <Route exact path="/chats" component={Chatpage} />
-          </Switch>
-        </React.Suspense>
-      </Router>
+      <React.Suspense fallback={<Loader />}>
+        <Switch>
+          <Route exact path="/signup" component={Signup} />
+          <Route exact path="/" component={Login} />
+          <Route exact path="/forgot/password" component={ForgetPassowrd} />
+          <Route exact path="/chats" component={Chatpage} />
+        </Switch>
+      </React.Suspense>
     </div>
   );
 }
